@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -39,9 +40,22 @@ func reader(conn *websocket.Conn) {
 	}
 }
 
+func cookieSetter(w http.ResponseWriter, r *http.Request) {
+	expire := time.Now().Add(20 * time.Minute) // Expires in 20 minutes
+	cookie := http.Cookie{Name: "secureusername", Value: "secureuser", Path: "/", Expires: expire, MaxAge: 86400, HttpOnly: true, Secure: true, SameSite: http.SameSiteNoneMode}
+	http.SetCookie(w, &cookie)
+	w.Header().Add("Access-Control-Allow-Origin", "http://localhost:4200")
+	w.Header().Add("Access-Control-Allow-Headers", "*")
+	w.Header().Add("Access-Control-Allow-Methods", "*")
+	w.Header().Add("Access-Control-Allow-Credentials", "true")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("cookies set"))
+}
+
 func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 	// upgrade this connection to a WebSocket
 	// connection
+	fmt.Println(r.Cookies())
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -59,10 +73,11 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 
 func setupRoutes() {
 	http.HandleFunc("/ws", wsEndpoint)
+	http.HandleFunc("/setCookies", cookieSetter)
 }
 
 func main() {
 	fmt.Println("Hello World")
 	setupRoutes()
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":80", nil))
 }
